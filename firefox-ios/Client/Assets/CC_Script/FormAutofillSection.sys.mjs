@@ -179,15 +179,14 @@ export class FormAutofillSection {
 
     const autofillableSections = [];
     for (const section of sections) {
-      const fieldDetails = section.fieldDetails;
-      if (!fieldDetails.length) {
+      if (!section.fieldDetails.length) {
         continue;
       }
 
       const autofillableSection =
         section.type == FormSection.ADDRESS
-          ? new FormAutofillAddressSection(fieldDetails)
-          : new FormAutofillCreditCardSection(fieldDetails);
+          ? new FormAutofillAddressSection(section.fieldDetails)
+          : new FormAutofillCreditCardSection(section.fieldDetails);
 
       if (ignoreInvalid && !autofillableSection.isValidSection()) {
         continue;
@@ -291,7 +290,11 @@ export class FormAutofillSection {
     };
 
     for (const detail of this.fieldDetails) {
-      const { filledValue } = formFilledData.get(detail.elementId);
+      // Do not save security code.
+      if (detail.fieldName == "cc-csc") {
+        continue;
+      }
+      const { filledValue } = formFilledData.get(detail.elementId) ?? {};
 
       if (
         !filledValue ||
@@ -322,9 +325,15 @@ export class FormAutofillSection {
    */
   getAutofillFields() {
     return this.fieldDetails.filter(fieldDetail => {
-      // When both visible and invisible <select> elements exist, we only autofill the
-      // visible <select>.
-      if (fieldDetail.localName == "select" && !fieldDetail.isVisible) {
+      // We don't save security code, but if somehow the profile has securty code,
+      // make sure we don't autofill it.
+      if (fieldDetail.fieldName == "cc-csc") {
+        return false;
+      }
+
+      // When both visible and invisible elements exist, we only autofill the
+      // visible element.
+      if (!fieldDetail.isVisible) {
         return !this.fieldDetails.some(
           field => field.fieldName == fieldDetail.fieldName && field.isVisible
         );
@@ -341,7 +350,6 @@ export class FormAutofillSection {
       return;
     }
 
-    lazy.AutofillTelemetry.recordDetectedSectionCount(this.fieldDetails);
     lazy.AutofillTelemetry.recordFormInteractionEvent(
       "detected",
       this.flowId,
@@ -377,7 +385,8 @@ export class FormAutofillSection {
   }
 
   onSubmitted(formFilledData) {
-    lazy.AutofillTelemetry.recordSubmittedSectionCount(this.fieldDetails, 1);
+    this.submitted = true;
+
     lazy.AutofillTelemetry.recordFormInteractionEvent(
       "submitted",
       this.flowId,
