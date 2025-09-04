@@ -1,4 +1,4 @@
----
+--
 autopush-feature:
   description: This property defines the autopush feature configuration
   hasExposure: true
